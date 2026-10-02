@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Trade & Item Drop System</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; padding: 20px; }
+    
+    .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; margin: 0 auto; }
+    .panel { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; }
+    
+    h2 { font-size: 18px; margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+    
+    .item-list { display: flex; flex-direction: column; gap: 8px; }
+    .item-row { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 8px 12px; border-radius: 4px; }
+    
+    button { background: #0284c7; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    button:hover { background: #0369a1; }
+    button.lock-btn { background: #16a34a; width: 100%; margin-top: 12px; padding: 10px; }
+    button.cancel-btn { background: #dc2626; }
+
+    .trade-window { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .trade-box { background: #0f172a; padding: 12px; border-radius: 6px; border: 2px solid transparent; }
+    .trade-box.locked { border-color: #16a34a; }
+    
+    .status-tag { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #475569; }
+    .status-tag.locked { background: #16a34a; }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard">
+    <!-- INVENTORY & WORLD -->
+    <div class="panel">
+      <h2>My Inventory</h2>
+      <div id="inventoryList" class="item-list"></div>
+
+      <h2 style="margin-top: 24px;">Ground Drops (World)</h2>
+      <div id="groundList" class="item-list"></div>
+    </div>
+
+    <!-- TRADE OVERLAY -->
+    <div class="panel">
+      <h2>Active Trade</h2>
+      <div id="noTrade">No active trade session.</div>
+      
+      <div id="tradeUI" style="display: none;">
+        <div class="trade-window">
+          <!-- MY STAGE -->
+          <div id="myTradeBox" class="trade-box">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <strong>You Offer</strong>
+              <span id="myLockStatus" class="status-tag">UNLOCKED</span>
+            </div>
+            <div id="myStagedItems" class="item-list"></div>
+          </div>
+
+          <!-- PARTNER STAGE -->
+          <div id="partnerTradeBox" class="trade-box">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <strong>Partner Offers</strong>
+              <span id="partnerLockStatus" class="status-tag">UNLOCKED</span>
+            </div>
+            <div id="partnerStagedItems" class="item-list"></div>
+          </div>
+        </div>
+
+        <button id="lockTradeBtn" class="lock-btn" onclick="lockTrade()">Accept & Lock Offer</button>
+        <button class="cancel-btn" style="width:100%; margin-top:8px; padding:8px;" onclick="cancelTrade()">Cancel Trade</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let ws = new WebSocket('ws://localhost:8080');
+    let myPlayerId = null;
+    let activeTradeId = null;
+
+    ws.onmessage = (event) => {
+      const { type, data } = JSON.parse(event.data);
+
+      switch (type) {
+        case 'CONNECTED':
+          myPlayerId = data.playerId;
+          renderInventory(data.inventory);
+          break;
+
+        case 'INVENTORY_UPDATED':
+          renderInventory(data.inventory);
+          break;
+
+        case 'ITEM_DROPPED_IN_WORLD':
+          addGroundItem(data);
+          break;
+
+        case 'ITEM_REMOVED_FROM_WORLD':
+          const elem = document.getElementById(data.dropId);
+          if (elem) elem.remove();
+          break;
+
+        case 'TRADE_STARTED':
+          activeTradeId = data.tradeId;
+          document.getElementById('noTrade').style.display = 'none';
+          document.getElementById('tradeUI').style.display = 'block';
+          break;
+
+        case 'TRADE_UPDATED':
+          renderTradeState(data);
+          break;
+
+        case 'TRADE_COMPLETED':
+          alert('Trade Successful!');
+          resetTradeUI();
+          break;
+
+        case 'TRADE_CANCELLED':
+          alert('Trade Cancelled');
+          resetTradeUI();
+          break;
+      }
+    };
+
+    // --- ACTIONS ---
+    function dropItem(instanceId) {
+      ws.send(JSON.stringify({ type: 'DROP_ITEM', data: { instanceId, quantity: 1 } }));
+    }
+
+    function pickupItem(dropId) {
+      ws.send(JSON.stringify({ type: 'PICKUP_ITEM', data: { dropId } }));
+    }
+
+    function stageItem(instanceId) {
+      if (!activeTradeId) return;
+      ws.send(JSON.stringify({ type: 'STAGE_TRADE_ITEM', data: { tradeId: activeTradeId, instanceId, quantity: 1 } }));
+    }
+
+    function lockTrade() {
+      if (!activeTradeId) return;
+      ws.send(JSON.stringify({ type: 'LOCK_TRADE', data: { tradeId: activeTradeId } }));
+    }
+
+    function cancelTrade() {
+      if (!activeTradeId) return;
+      ws.send(JSON.stringify({ type: 'CANCEL_TRADE', data: { tradeId: activeTradeId } }));
+    }
+
+    // --- RENDER HELPERS ---
+    function renderInventory(items) {
+      const container = document.getElementById('inventoryList');
+      container.innerHTML = items.map(item => `
+        <div class="item-row">
+          <span>${item.name} (x${item.count})</span>
+          <div>
+            ${activeTradeId ? `<button onclick="stageItem('${item.instanceId}')">+ Offer</button>` : ''}
+            <button onclick="dropItem('${item.instanceId}')" style="background:#475569;">Drop</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addGroundItem(drop) {
+      const container = document.getElementById('groundList');
+      const div = document.createElement('div');
+      div.id = drop.dropId;
+      div.className = 'item-row';
+      div.innerHTML = `
+        <span>${drop.item.name} (x${drop.quantity})</span>
+        <button onclick="pickupItem('${drop.dropId}')">Pick Up</button>
+      `;
+      container.appendChild(div);
+    }
+
+    function renderTradeState(data) {
+      // Render my staged items
+      document.getElementById('myStagedItems').innerHTML = data.myStaged.map(i => `
+        <div class="item-row"><span>${i.name} (x${i.count})</span></div>
+      `).join('');
+      
+      // Render partner staged items
+      document.getElementById('partnerStagedItems').innerHTML = data.partnerStaged.map(i => `
+        <div class="item-row"><span>${i.name} (x${i.count})</span></div>
+      `).join('');
+
+      // Status Banners
+      updateLockStatus('myLockStatus', 'myTradeBox', data.myLocked);
+      updateLockStatus('partnerLockStatus', 'partnerTradeBox', data.partnerLocked);
+    }
+
+    function updateLockStatus(statusElId, boxElId, isLocked) {
+      const statusEl = document.getElementById(statusElId);
+      const boxEl = document.getElementById(boxElId);
+      if (isLocked) {
+        statusEl.innerText = 'LOCKED';
+        statusEl.classList.add('locked');
+        boxEl.classList.add('locked');
+      } else {
+        statusEl.innerText = 'UNLOCKED';
+        statusEl.classList.remove('locked');
+        boxEl.classList.remove('locked');
+      }
+    }
+
+    function resetTradeUI() {
+      activeTradeId = null;
+      document.getElementById('noTrade').style.display = 'block';
+      document.getElementById('tradeUI').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

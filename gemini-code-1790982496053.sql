@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS player_progress (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    level INT NOT NULL DEFAULT 1,
+    xp INT NOT NULL DEFAULT 0,
+    health INT NOT NULL DEFAULT 100,
+    max_health INT NOT NULL DEFAULT 100,
+    attack_power INT NOT NULL DEFAULT 10,
+    unlocked_skills JSONB NOT NULL DEFAULT '["basic_attack"]'::jsonb,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <style>
+    body { background: #0f172a; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { border: 2px solid #334155; border-radius: 8px; background: #020617; }
+  </style>
+</head>
+<body>
+
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <script src="client.js"></script>
+  <script src="game-renderer.js"></script>
+  <script>
+    const game = new SmoothMultiplayerGame('gameCanvas', 'ws://localhost');
+    game.localPlayerId = 'user-uuid-123';
+    game.wsClient.connect(game.localPlayerId, 'room-uuid-456', 'FRY89');
+    game.start();
+  </script>
+</body>
+</html>

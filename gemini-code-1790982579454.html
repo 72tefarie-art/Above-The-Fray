@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game HUD Overlay</title>
+  <style>
+    /* Reset & Base Styles */
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #090d16;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #f1f5f9;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Modal Backdrop */
+    .hud-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(2, 6, 23, 0.75);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    .hud-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Main Window Frame */
+    .window-frame {
+      width: 720px;
+      height: 520px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header & Navigation Tabs */
+    .window-header {
+      background: #1e293b;
+      padding: 0 16px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #334155;
+    }
+
+    .tab-group { display: flex; gap: 8px; }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 14px 20px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover { color: #f8fafc; }
+    .tab-btn.active {
+      color: #38bdf8;
+      border-bottom-color: #38bdf8;
+    }
+
+    .close-btn {
+      background: #334155;
+      border: none;
+      color: #94a3b8;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .close-btn:hover { background: #ef4444; color: #fff; }
+
+    /* Content Panels */
+    .window-body { flex: 1; padding: 20px; overflow-y: auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* -------------------------------------------------- */
+    /* QUEST LOG STYLES                                   */
+    /* -------------------------------------------------- */
+    .quest-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .quest-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .quest-title { font-size: 16px; font-weight: 700; color: #f8fafc; }
+    .quest-status {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+    }
+    .status-in-progress { background: #0284c7; color: #e0f2fe; }
+    .status-completed { background: #15803d; color: #dcfce7; }
+
+    .quest-desc { font-size: 13px; color: #94a3b8; margin-bottom: 12px; }
+
+    .objective-item {
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: #0f172a;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: #38bdf8;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .reward-pills { display: flex; gap: 8px; margin-top: 12px; }
+    .reward-pill {
+      font-size: 11px;
+      background: #334155;
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: #fbbf24;
+    }
+
+    /* -------------------------------------------------- */
+    /* INVENTORY GRID STYLES                              */
+    /* -------------------------------------------------- */
+    .inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+    }
+
+    .inventory-slot {
+      aspect-ratio: 1;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.1s;
+    }
+
+    .inventory-slot:hover {
+      border-color: #38bdf8;
+      transform: translateY(-2px);
+    }
+
+    .item-icon { font-size: 24px; }
+    .item-count {
+      position: absolute;
+      bottom: 4px;
+      right: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #f1f5f9;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 0 4px;
+      border-radius: 4px;
+    }
+
+    /* Hotkey Indicator Legend */
+    .controls-hint {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      font-size: 13px;
+      color: #64748b;
+    }
+    .kbd {
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Controls Legend -->
+  <div class="controls-hint">
+    Press <span class="kbd">Q</span> for Quest Log | <span class="kbd">I</span> for Inventory | <span class="kbd">ESC</span> to Close
+  </div>
+
+  <!-- HUD Window Overlay -->
+  <div id="hudOverlay" class="hud-overlay">
+    <div class="window-frame">
+      <!-- Header / Tabs -->
+      <div class="window-header">
+        <div class="tab-group">
+          <button class="tab-btn active" onclick="switchTab('quests')">Quests</button>
+          <button class="tab-btn" onclick="switchTab('inventory')">Inventory</button>
+        </div>
+        <button class="close-btn" onclick="toggleOverlay()">✕</button>
+      </div>
+
+      <!-- Body / Content -->
+      <div class="window-body">
+        
+        <!-- QUEST LOG TAB -->
+        <div id="questsTab" class="tab-content active">
+          <div id="questList">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- INVENTORY TAB -->
+        <div id="inventoryTab" class="tab-content">
+          <div id="inventoryGrid" class="inventory-grid">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ----------------------------------------------------
+    // STATE & DUMMY DATA
+    // ----------------------------------------------------
+    const gameState = {
+      quests: [
+        {
+          id: 'quest_slime_hunter',
+          title: 'Slime Hunter',
+          description: 'Clear out the slimes troubling the nearby village.',
+          status: 'IN_PROGRESS',
+          progress: 3,
+          required: 5,
+          rewards: ['150 XP', '2x Health Potion']
+        },
+        {
+          id: 'quest_first_step',
+          title: 'Welcome to Above the Fray',
+          description: 'Speak with the village elder to receive your gear.',
+          status: 'COMPLETED',
+          progress: 1,
+          required: 1,
+          rewards: ['50 XP', '10x Bronze Coin']
+        }
+      ],
+      inventory: [
+        { id: 'health_potion', name: 'Health Potion', icon: '🧪', count: 2 },
+        { id: 'bronze_coin', name: 'Bronze Coin', icon: '🪙', count: 10 },
+        { id: 'iron_sword', name: 'Iron Sword', icon: '⚔️', count: 1 },
+      ],
+      maxInventorySlots: 18
+    };
+
+    // ----------------------------------------------------
+    // UI RENDERERS
+    // ----------------------------------------------------
+    function renderQuests() {
+      const container = document.getElementById('questList');
+      container.innerHTML = gameState.quests.map(q => {
+        const pct = Math.min(100, Math.floor((q.progress / q.required) * 100));
+        const statusClass = q.status === 'COMPLETED' ? 'status-completed' : 'status-in-progress';
+        
+        return `
+          <div class="quest-card">
+            <div class="quest-header">
+              <span class="quest-title">${q.title}</span>
+              <span class="quest-status ${statusClass}">${q.status.replace('_', ' ')}</span>
+            </div>
+            <p class="quest-desc">${q.description}</p>
+            <div class="objective-item">
+              Defeat Slimes: ${q.progress} / ${q.required}
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: ${pct}%"></div>
+              </div>
+            </div>
+            <div class="reward-pills">
+              ${q.rewards.map(r => `<span class="reward-pill">🎁 ${r}</span>`).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderInventory() {
+      const grid = document.getElementById('inventoryGrid');
+      let html = '';
+
+      for (let i = 0; i < gameState.maxInventorySlots; i++) {
+        const item = gameState.inventory[i];
+        if (item) {
+          html += `
+            <div class="inventory-slot" title="${item.name}">
+              <span class="item-icon">${item.icon}</span>
+              <span class="item-count">${item.count}</span>
+            </div>
+          `;
+        } else {
+          // Empty Slot
+          html += `<div class="inventory-slot"></div>`;
+        }
+      }
+      grid.innerHTML = html;
+    }
+
+    // ----------------------------------------------------
+    // CONTROLLER & HOTKEYS
+    // ----------------------------------------------------
+    const overlay = document.getElementById('hudOverlay');
+
+    function toggleOverlay(targetTab = null) {
+      const isActive = overlay.classList.contains('active');
+      
+      if (!isActive) {
+        overlay.classList.add('active');
+        if (targetTab) switchTab(targetTab);
+      } else if (targetTab && !isTabActive(targetTab)) {
+        switchTab(targetTab);
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
+
+    function isTabActive(tabName) {
+      return document.getElementById(`${tabName}Tab`).classList.contains('active');
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      if (tabName === 'quests') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('questsTab').classList.add('active');
+      } else {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('inventoryTab').classList.add('active');
+      }
+    }
+
+    // Global Key Listeners
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'q' || e.key === 'Q') toggleOverlay('quests');
+      if (e.key === 'i' || e.key === 'I') toggleOverlay('inventory');
+      if (e.key === 'Escape' && overlay.classList.contains('active')) toggleOverlay();
+    });
+
+    // Initial Population
+    renderQuests();
+    renderInventory();
+  </script>
+</body>
+</html>
