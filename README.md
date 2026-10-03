@@ -15,6 +15,31 @@ Above-The-Fray is an interactive simulation and decision-making game platform bu
 
 ```mermaid
 graph TD
-A[User Request] --> B[Gemini API]
-B --> C[JSON Response]
-```
+    subgraph Client ["Client Side (Browser)"]
+        UI["index.html / CSS"]
+        AppJS["script.js (Frontend Logic)"]
+    end
+
+    subgraph Server ["Backend (Node.js)"]
+        ServerJS["server.js / App Logic"]
+        GeminiClient["Gemini API Integration"]
+    end
+
+    subgraph Storage ["Database Layer"]
+        DB[(SQL Database / Tables)]
+    end
+
+    subgraph External ["External Services"]
+        Gemini[Gemini API]
+    end
+
+    %% Flow connections
+    UI -->|User Trigger| AppJS
+    AppJS -->|HTTP POST Request| ServerJS
+    ServerJS -->|Passes Prompt| GeminiClient
+    GeminiClient -->|API Call| Gemini
+    Gemini -->|Returns JSON Decisions| GeminiClient
+    GeminiClient -->|Response Data| ServerJS
+    ServerJS -->|SQL Queries: Log Decisions| DB
+    ServerJS -->|JSON Response| AppJS
+    AppJS -->|Updates DOM| UI
