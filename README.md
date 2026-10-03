@@ -15,5 +15,5 @@ Above-The-Fray is an interactive simulation and decision-making game platform bu
 
 ```mermaid
 graph TD
-    A[User Request] --> B[Gemini API]
-    B --> C[JSON Response] 
+A[User Request] --> B[Gemini API]
+B --> C[JSON Response]
