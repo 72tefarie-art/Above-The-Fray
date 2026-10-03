@@ -12,3 +12,8 @@ Above-The-Fray is an interactive simulation and decision-making game platform bu
 ## How to Run
 1. Clone the repository: `git clone https://github.com/72tefarie-art/Above-The-Fray.git`
 2. Open `index.html` in your browser or run the JavaScript entry point file.
+```mermaid
+graph TD
+    A[User Request] --> B[Gemini API]
+    B --> C[JSON Response]
+```
