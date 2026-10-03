@@ -1,0 +1,26 @@
+{
+  "name": "above-the-fray",
+  "version": "1.0.0",
+  "description": "Simulation evaluation decision making software game",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/72tefarie-art/Above-The-Fray.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/72tefarie-art/Above-The-Fray/issues"
+  },
+  "homepage": "https://github.com/72tefarie-art/Above-The-Fray#readme",
+  "dependencies": {
+    "pg": "^8.23.1",
+    "ws": "^8.22.0"
+  }
+}
